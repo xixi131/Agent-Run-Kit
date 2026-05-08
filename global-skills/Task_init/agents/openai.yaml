@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task_init"
+  short_description: "Turn a requirement into an executable feature_list.json queue"
+  default_prompt: "Use $Task_init to move the current feature_list.json queue into final_feature_list.json, clear feature_list.json, and write a very fine-grained active queue of runnable delivery-slice tasks for the current requirement."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Context Archive"
+  short_description: "Compress repository memory files into a lean startup context"
+  default_prompt: "Use $Context_archive to slim AGENTS.md to project facts, refresh agent-state.md, and roll codex-progress history into a short current summary plus archive."

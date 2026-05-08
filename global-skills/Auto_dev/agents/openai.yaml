@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auto_dev"
+  short_description: "Run the repository's feature_list.json parent-child dev loop"
+  default_prompt: "Use $Auto_dev to complete the requested number of pending tasks from feature_list.json, validating each task before updating feature_list.json and codex-progress.md."
