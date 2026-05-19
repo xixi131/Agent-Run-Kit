@@ -80,3 +80,5 @@ $Context_archive 压缩当前项目记忆层并刷新 agent-state.md
 推荐只放项目摘要、关键业务规则和文档路由。详细规范拆到 `project_DS/specification/`，然后在 `AGENTS.md` 里告诉代理什么时候读取哪个文件。
 
 这样可以减少默认上下文，节省 token，也能让代理启动更快、注意力更集中。
+
+友链：[linux.do](https://linux.do/)
