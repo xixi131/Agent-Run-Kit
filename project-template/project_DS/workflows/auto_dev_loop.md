@@ -55,14 +55,17 @@ description: 父子 Agent 协作模式：读取 feature_list.json 状态机，�
 5. If the queue is placeholder-only, not executable, or stale for the current requirement, stop and ask the human to run the planning flow first.
 6. Dispatch a worker with the selected `task_id` and task only, together with its validation steps and the escalation contract. Do not broaden the scope.
 7. Wait for the worker result.
-8. Verify acceptance:
-   * the assigned `task_id` in `feature_list.json` is now `"passes": true`,
-   * `codex-progress.md` has a new matching entry,
+8. Verify the worker result:
    * the worker reports completed validation for every listed step,
-   * and the worker reports the concrete verification path used for the task, such as browser MCP, API requests, and database checks when applicable.
+   * the worker reports the concrete verification path used for the task, such as browser MCP, API requests, and database checks when applicable,
+   * and the worker changed only files inside the assigned task scope.
 9. If the worker reports any escalation, stop immediately and surface the blocker to the human.
-10. If acceptance fails, stop and surface the mismatch to the human.
-11. If acceptance succeeds, the parent updates shared coordination files, creates the focused commit, decrements the remaining task count, and continues until the requested number is complete.
+10. If worker-result verification fails, stop and surface the mismatch to the human.
+11. If worker-result verification succeeds, the parent updates shared coordination files:
+   * set the assigned `task_id` in `feature_list.json` to `"passes": true`,
+   * append a matching entry to `codex-progress.md`,
+   * and refresh `agent-state.md` when the first pending task or recommended read path changes.
+12. Verify the updated coordination files, create the focused commit, decrement the remaining task count, and continue until the requested number is complete.
 
 ### Worker Loop
 1. Read `AGENTS.md` and obey the repository rules before touching code.

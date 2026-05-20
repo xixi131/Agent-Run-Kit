@@ -101,9 +101,11 @@ Every task in `feature_list.json` must declare:
 Default budget guidance:
 * `docs`: `5`
 * `planning`: `5`
-* `frontend`: `15` to `25`
-* `backend`: `15` to `25`
-* `e2e`: `20` to `35`
+* `frontend`: `8` to `10`
+* `backend`: `8` to `10`
+* `e2e`: `10`
+
+Treat budgets above `10` minutes as a signal that the task should usually be split further; allow `15` only for an exceptional task that cannot be split without losing coherence.
 
 ## Parallel dispatch policy
 When the user asks `$Auto_dev` to complete multiple tasks, parallelism is preferred only after dependency analysis.
