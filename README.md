@@ -28,7 +28,7 @@ global-skills/Context_archive
 复制后重点改这几处：
 
 - `AGENTS.md`：写项目摘要、核心规则、文档路由。
-- `init.sh`：改成这个项目真实的启动或验证命令。
+- `init.sh`：改成这个项目真实的启动或验证命令；模板里的占位脚本会故意失败退出。
 - `project_DS/specification/*`：替换成项目自己的前端、UI、后端、架构规范。
 - `feature_list.json`：保持空数组，后续交给 `$Task_init` 生成当前任务队列。
 - `final_feature_list.json`：保持空数组，`$Task_init` 会把旧队列追加到这里。
@@ -55,7 +55,15 @@ $Auto_dev 完成 1 个任务
 $Auto_dev 完成 3 个任务
 ```
 
-`$Auto_dev` 会先判断任务之间有没有依赖关系。没有依赖、写入范围不冲突的任务会并行派发；有依赖的任务会按顺序执行。
+`$Task_init` 写入的任务应包含稳定唯一的 `task_id`、`task_type`、`budget_minutes` 和 `passes`。
+
+`$Task_init` 支持三种队列更新模式：
+
+- `replace-active`：归档当前 active 队列，清空后写入新队列。
+- `rewrite-pending`：保留已完成任务，归档被替换的未完成任务，再写入重新规划的未完成队列。
+- `append-phase`：保留当前 active 队列，并把新阶段任务追加到队列末尾。
+
+`$Auto_dev` 会先判断任务之间有没有依赖关系。没有依赖、写入范围不冲突的任务会并行派发；有依赖的任务会按顺序执行。并行执行时，worker 只负责实现和返回验证证据，父代理统一更新 `feature_list.json`、`agent-state.md`、`codex-progress.md` 并提交 commit。
 
 上下文变长时，用：
 
@@ -66,7 +74,7 @@ $Context_archive 压缩当前项目记忆层并刷新 agent-state.md
 ## 记忆层文件
 
 - `AGENTS.md`：项目稳定事实、核心规则、按需读文档的路由。
-- `feature_list.json`：当前 active 任务队列。
+- `feature_list.json`：当前 active 任务队列，每个任务应包含稳定唯一的 `task_id`。
 - `final_feature_list.json`：历史任务队列归档，由 `$Task_init` 追加写入。
 - `agent-state.md`：当前交接状态。
 - `codex-progress.md`：近期进度日志。

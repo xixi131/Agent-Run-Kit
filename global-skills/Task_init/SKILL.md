@@ -16,7 +16,7 @@ Read the smallest reliable planning context first:
 * `feature_list.json`
 * `final_feature_list.json` if it exists
 
-Read [../../../project_DS/workflows/task_init_loop.md](../../../project_DS/workflows/task_init_loop.md) for the detailed planning contract.
+Read `project_DS/workflows/task_init_loop.md` from the current project root for the detailed planning contract.
 
 Read [references/prompt-patterns.md](references/prompt-patterns.md) when you need ready-to-use prompt examples.
 
@@ -33,31 +33,36 @@ Use conditional reading for everything else:
    * or `AGENTS.md` has drifted into duplicated generic SOP instead of lean project facts,
    * stop normal planning and use `$Context_archive` first, then resume planning.
 3. Read the current `feature_list.json` and `final_feature_list.json` if it exists.
-4. Preserve the old active queue before writing a new one:
+4. Choose the queue update mode before writing tasks:
+   * `replace-active`: archive every current active task into `final_feature_list.json`, clear `feature_list.json`, then write only the new active queue,
+   * `rewrite-pending`: preserve completed active tasks in place, archive replaced pending tasks into `final_feature_list.json`, then write the regenerated pending tasks after the completed tasks,
+   * `append-phase`: keep the current active queue in place and append the new phase tasks after the existing items.
+5. Preserve history according to the selected mode:
    * if `final_feature_list.json` does not exist, create it as an empty JSON array,
-   * append every valid task object from the current `feature_list.json` to `final_feature_list.json`,
-   * preserve each task's existing `passes` state and fields,
-   * then clear `feature_list.json` to an empty array before writing the newly planned queue.
-5. Load only the relevant docs from `project_DS/` for the current requirement. Do not scan every doc by default.
-6. Read `codex-progress.md` only if the short handoff is not enough for safe planning.
-7. Before writing any task, build a requirement fulfillment map:
+   * never drop a valid current task object silently,
+   * preserve each archived task's existing `passes` state and fields,
+   * report exactly which mode was used and what moved into `final_feature_list.json`.
+6. Load only the relevant docs from `project_DS/` for the current requirement. Do not scan every doc by default.
+7. Read `codex-progress.md` only if the short handoff is not enough for safe planning.
+8. Before writing any task, build a requirement fulfillment map:
    * name each user-visible capability or acceptance outcome in the requirement,
    * identify the smallest coherent runnable slice that proves progress toward that outcome,
    * include all layers needed for that slice to work, even if that means making the task `e2e`,
    * defer low-value plumbing-only work unless it is the next prerequisite for a runnable slice,
    * avoid tasks that merely prepare code but leave no observable demand-side behavior.
-8. Then reason about the likely implementation path in this repository:
+9. Then reason about the likely implementation path in this repository:
    * the target user-visible outcome,
    * the likely modules, files, and layers involved,
    * the dependency order,
    * the validation path,
    * and which parts can be completed independently.
-9. Classify each generated task as `docs`, `planning`, `frontend`, `backend`, or `e2e`.
-10. Evaluate task complexity and assign `budget_minutes` to every task.
-11. Decompose the implementation path into ordered, executable delivery slices.
-12. Write only the newly planned queue into `feature_list.json` using the repository schema.
-13. Refresh `agent-state.md` when the queue shape or next recommended read path has materially changed.
-14. Summarize what was moved into `final_feature_list.json`, the generated task groups, major assumptions, and any risks.
+10. Classify each generated task as `docs`, `planning`, `frontend`, `backend`, or `e2e`.
+11. Evaluate task complexity and assign `budget_minutes` to every task.
+12. Decompose the implementation path into ordered, executable delivery slices.
+13. Assign every new task a stable unique `task_id` that remains meaningful if tasks are reordered.
+14. Write the updated active queue into `feature_list.json` using the repository schema.
+15. Refresh `agent-state.md` when the queue shape or next recommended read path has materially changed.
+16. Summarize the selected mode, what was moved into `final_feature_list.json`, the generated task groups, major assumptions, and any risks.
 
 ## Skill boundaries
 Use `$Task_init` when you need to create or rewrite the active executable queue in `feature_list.json`.
@@ -76,6 +81,7 @@ Each generated task must satisfy all of the following:
 * one task equals one very small independently executable outcome,
 * each implementation task must complete a runnable, testable slice of the requirement, not only a disconnected technical prerequisite,
 * every task includes `task_type`,
+* every task includes a stable unique `task_id`,
 * every task includes `budget_minutes`,
 * tasks are ordered by dependency and business flow,
 * `description` states a user-visible or business-visible result,
@@ -171,6 +177,7 @@ Use this JSON shape:
 ```json
 [
   {
+    "task_id": "docs-baseline-shell",
     "task_type": "docs",
     "description": "Create an empty baseline document shell.",
     "steps": [
@@ -188,7 +195,8 @@ Use this JSON shape:
 Stop and escalate instead of writing low-confidence tasks when:
 * prerequisites are missing,
 * the requirement is unclear, conflicting, or underspecified,
-* the requested queue rewrite would overwrite completed history without explicit human approval.
+* the requested queue rewrite would overwrite completed history without explicit human approval,
+* the requested queue update mode is ambiguous and choosing wrong could hide active work.
 
 When escalating, include:
 * blocker category: `missing-prerequisite` or `requirement-unclear`,
