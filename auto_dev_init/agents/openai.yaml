@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auto Dev Init"
+  short_description: "Initialize a repository with local auto_dev workflow files"
+  default_prompt: "Use $auto_dev_init to copy the bundled AGENTS.md, feature_list.json, progress files, init.sh, and project_DS workflow docs into the specified project directory, and add them to .git/info/exclude when the target is a Git repository."
