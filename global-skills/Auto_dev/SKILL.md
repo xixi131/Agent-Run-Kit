@@ -41,10 +41,10 @@ Codex Memories can reduce repeated context recovery, but they are not the source
    * or `agent-state.md` is missing or clearly stale,
    * or `AGENTS.md` has drifted into duplicated generic SOP instead of lean project facts,
    * stop normal execution and use `$Context_archive` first, then resume the loop.
-3. Read `feature_list.json` top to bottom and choose the first item with `"passes": false`.
+3. Read `feature_list.json` top to bottom and choose the first item with `"passes": false`; record its stable `task_id`.
 4. If there is no pending task, stop and report that the queue is empty.
 5. If the queue is placeholder-only, not executable, or clearly stale versus the user's new requirement, stop and tell the human to run `$Task_init` first.
-6. Read the task's `task_type` and `budget_minutes` before dispatch:
+6. Read the task's `task_id`, `task_type`, and `budget_minutes` before dispatch:
    * `docs` and `planning` are lightweight fast-path tasks,
    * `frontend`, `backend`, and `e2e` are full execution-path tasks.
 7. If `task_type` is missing, treat the queue as stale and send the human to `$Task_init` to regenerate it with typed tasks.
@@ -57,21 +57,29 @@ Codex Memories can reduce repeated context recovery, but they are not the source
    * dispatch one worker for a single task when the next task blocks all others,
    * dispatch multiple workers in parallel when tasks in the current layer are independent,
    * keep ownership narrow and tell every worker they are not alone in the codebase, must not revert others' edits, and must stay inside their assigned responsibility.
-10. For each dispatched task, pass only the task description, `task_type`, `budget_minutes`, `steps`, expected write scope when inferable, and the repository escalation contract.
+10. For each dispatched task, pass only the `task_id`, task description, `task_type`, `budget_minutes`, `steps`, expected write scope when inferable, and the repository escalation contract.
 11. For a `docs` or `planning` task, start a hard timeout equal to `budget_minutes`. When the budget is reached, immediately reclaim the worker result. Do not wait for natural completion.
 12. Wait for the current dependency layer to finish before dispatching tasks that depend on it.
 13. If a `docs` or `planning` task exceeds its budget, or clearly requires the heavy development path to finish, stop and escalate with blocker category `task-process-mismatch`.
 14. If any worker reports an escalation, stop immediately. Do not dispatch the next task until the human resolves the blocker.
-15. Accept each task only if all of the following are true:
-   * the assigned task is now marked `"passes": true`,
-   * `codex-progress.md` contains a fresh matching log entry,
+15. Accept each worker result only if all of the following are true:
    * the worker reports validation against every listed step,
-   * and the worker reports the concrete verification path used for the task.
-16. Parent performs all Git post-processing for accepted tasks: stage the task-scoped files and create one focused commit per accepted task, or one focused batch commit only when parallel tasks are tightly related and conflict-free.
-17. If parent-side commit fails, retry at most 3 times (request elevated permissions if sandbox blocks `.git/index.lock`).
-18. Run any requested or required remote Git operation through escalated permissions from the start, especially `git fetch`, `git pull`, and `git push`.
-19. If the third parent-side commit attempt fails, or a remote Git operation fails after the allowed escalated attempt, stop immediately and escalate as `post-processing-blocked`.
-20. Continue by dependency layer until the requested number of tasks is complete, or stop early on any escalation.
+   * the worker reports the concrete verification path used for the task,
+   * the changed files stay inside the task-scoped write responsibility,
+   * and the worker did not mutate shared coordination files unless explicitly assigned to do so.
+16. Parent performs all shared state updates for accepted tasks in the dependency layer:
+   * set each accepted `task_id` in `feature_list.json` to `"passes": true`,
+   * refresh `agent-state.md` when the first pending task or startup read path changes,
+   * append one fresh matching log entry per accepted task to `codex-progress.md`.
+17. Parent verifies acceptance after the shared state update:
+   * every accepted `task_id` is now marked `"passes": true`,
+   * `codex-progress.md` contains a fresh matching log entry for every accepted task,
+   * and `agent-state.md` still matches the first pending task when it exists.
+18. Parent performs all Git post-processing for accepted tasks: stage the task-scoped files plus the parent-updated coordination files and create one focused commit per accepted task, or one focused batch commit only when parallel tasks are tightly related and conflict-free.
+19. If parent-side commit fails, retry at most 3 times (request elevated permissions if sandbox blocks `.git/index.lock`).
+20. Run any requested or required remote Git operation through escalated permissions from the start, especially `git fetch`, `git pull`, and `git push`.
+21. If the third parent-side commit attempt fails, or a remote Git operation fails after the allowed escalated attempt, stop immediately and escalate as `post-processing-blocked`.
+22. Continue by dependency layer until the requested number of tasks is complete, or stop early on any escalation.
 
 ## Skill boundaries
 Use `$Auto_dev` when the queue already exists and you want to execute one or more pending tasks.
@@ -86,6 +94,7 @@ Hand off instead:
 
 ## Task type contract
 Every task in `feature_list.json` must declare:
+* `task_id`: a stable unique identifier that does not change when tasks are reordered
 * `task_type`: one of `docs`, `planning`, `frontend`, `backend`, or `e2e`
 * `budget_minutes`: the expected maximum execution time for the worker
 
@@ -102,8 +111,8 @@ When the user asks `$Auto_dev` to complete multiple tasks, parallelism is prefer
 * Parallelize independent tasks with disjoint write scopes, for example separate docs pages, separate UI pages, or unrelated backend endpoints.
 * Sequence dependent tasks, for example schema before API, API before frontend integration, parser before UI display, route before browser verification, or shared component before page usage.
 * Sequence tasks when likely file ownership overlaps, even if the descriptions look independent.
-* Never let parallel workers mutate the same task item in `feature_list.json`; each worker owns exactly one assigned item.
-* If workers need to update shared memory files, the parent must verify and reconcile `feature_list.json`, `agent-state.md`, and `codex-progress.md` after the layer finishes.
+* Never let parallel workers mutate `feature_list.json`, `agent-state.md`, or `codex-progress.md`; each worker owns exactly one assigned `task_id` and returns evidence to the parent.
+* The parent must update and reconcile `feature_list.json`, `agent-state.md`, and `codex-progress.md` after the layer finishes.
 * Report whether the run used parallel or sequential dispatch, and why.
 
 ## Git permissions policy
@@ -133,7 +142,7 @@ Use this path for `docs` and `planning` tasks:
    * basic structure check passes.
 8. Do not launch browser MCP, API checks, or heavy environment startup for a pure docs/planning task.
 9. If the task starts requiring code archaeology, runtime behavior confirmation, or cross-layer debugging, read only the minimum extra file needed. If it clearly requires the heavy path, stop and escalate as `task-process-mismatch`.
-10. Only after all validation passes, update `feature_list.json`, `agent-state.md` when relevant, and `codex-progress.md`.
+10. Only after all validation passes, return the validation evidence, changed file list, and a concise progress-log draft for the parent to write.
 11. Do not run `git add`, `git commit`, or other Git post-processing commands.
 12. Return the changed file list and a suggested focused commit message for the parent.
 
@@ -152,7 +161,7 @@ Use this path for `frontend`, `backend`, and `e2e` tasks:
 8. If validation fails, debug across the minimum necessary chain: browser/UI -> API -> backend -> database.
 9. Self-repair at most 3 times for the same failing symptom.
 10. Read `codex-progress-archive.md` only if older historical context is truly needed to resolve the blocker.
-11. Only after all validation passes, update `feature_list.json`, `agent-state.md` when relevant, and `codex-progress.md`.
+11. Only after all validation passes, return the validation evidence, changed file list, and a concise progress-log draft for the parent to write.
 12. Do not run `git add`, `git commit`, or other Git post-processing commands.
 13. Return the changed file list and a suggested focused commit message for the parent.
 

@@ -11,7 +11,7 @@ This file is the default-loaded project summary and operating constitution for C
 ## 2. Memory Files
 Agents should treat these files as the external memory layer:
 * `AGENTS.md`: stable project facts and routing rules
-* `feature_list.json`: active task queue and pass/fail state
+* `feature_list.json`: active task queue and pass/fail state; every task should include a stable `task_id`
 * `final_feature_list.json`: rolled-up previous task queues preserved by `$Task_init`
 * `agent-state.md`: current handoff summary
 * `codex-progress.md`: recent human/agent log
@@ -33,5 +33,7 @@ Tell agents which docs to read for which task types. Keep detailed rules outside
 * architecture or module boundaries: `project_DS/specification/project_architecture.md`
 * queue planning: `project_DS/workflows/task_init_loop.md`
 * automation execution: `project_DS/workflows/auto_dev_loop.md`
+
+Parent agents own shared coordination-file updates and Git commits during `$Auto_dev`; workers return validation evidence and changed-file lists.
 
 Keep this file short. Put generic workflow logic in global skills, not here.
