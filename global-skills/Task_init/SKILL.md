@@ -35,6 +35,11 @@ Use conditional reading for everything else:
 1. Read the incoming requirement carefully and identify the target business outcome.
    * If `.ark/lessons.json` exists and is non-empty, apply relevant lessons as constraints: avoid tasks that repeat known-bad patterns, include environment setup steps discovered in prior runs, and reflect architecture corrections into task boundaries.
    * If `.ark/project_goal.md` has a gap analysis, treat the listed gaps as the primary acceptance outcomes. Do not re-decompose the full requirement — generate only the tasks needed to close the specific gaps identified.
+   * **Infer the execution mode** from the requirement. If `.ark/project_goal.md` does not yet have a non-empty `## Mode` value (or the file does not exist), write the inferred mode now. Do not override a mode the user has already set explicitly.
+     - `workflow` — the requirement is a deterministic one-time operation with no measurable "done" state beyond task completion. Signal words: migrate, convert, generate, format, batch, rename, move.
+     - `agent` — the requirement calls for investigation or a single-pass fix that requires reasoning but not iterative re-planning. Signal words: debug, fix, refactor, optimize, investigate, diagnose, find why.
+     - `loop` — the requirement describes a feature or product capability with verifiable acceptance criteria. Signal words: implement, build, create, add feature, develop, make it possible to.
+   * For `loop` mode, if `## Acceptance Criteria` in `project_goal.md` is empty or placeholder-only, draft verifiable criteria from the requirement. Each criterion must be observable by browser, API call, or shell check — not vague. Leave drafting to the user if the requirement lacks enough specifics to write testable criteria.
 2. Run a memory-layer health check before planning:
    * if `.ark/codex-progress.md` is too long for default startup,
    * or `.ark/agent-state.md` is missing or clearly stale,
@@ -66,9 +71,9 @@ Use conditional reading for everything else:
 10. Classify each generated task as `docs`, `planning`, `frontend`, `backend`, or `e2e`.
 11. Evaluate task scope and assign `budget_minutes` to every task.
 12. Assign every new task a sequential `task_id` in the format `NNN-<slug>`, where NNN continues from the highest existing ID in the queue (e.g., `001-setup-schema`, `002-auth-endpoint`). This numbering lets users see total task count at a glance.
-13. Write the updated active queue into `.ark/feature_list.json` using the repository schema.
+13. Write the updated active queue into `.ark/feature_list.json` using the repository schema. If `project_goal.md` was created or updated, confirm its `## Mode` is set and (for `loop` mode) `## Acceptance Criteria` is non-empty before finishing.
 14. Refresh `.ark/agent-state.md` when the queue shape or next recommended read path has materially changed.
-15. Summarize the selected mode, what was moved into `final_feature_list.json`, the generated task groups, major assumptions, and any risks.
+15. Summarize the inferred or confirmed execution mode, the selected queue update mode, what was moved into `final_feature_list.json`, the generated task groups, major assumptions, and any risks.
 
 ## Skill boundaries
 
