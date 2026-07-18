@@ -1,6 +1,6 @@
 ---
 name: Auto_dev
-description: Coordinate a parent-child Codex development loop for this repository. Use when the user asks $Auto_dev to complete tasks from .ark/feature_list.json. Dispatch workers by task type, verify results, update coordination files, check acceptance criteria, and loop with gap-analysis replanning until all criteria pass or an escalation occurs.
+description: Coordinate a parent-child multi-agent execution loop for this repository. Reads the execution mode (workflow / agent / loop) from .ark/project_goal.md and adapts stopping behavior accordingly. Dispatches workers by task type and model tier, verifies results, updates coordination files, and in loop mode checks acceptance criteria with gap-analysis replanning until all criteria pass or an escalation occurs.
 ---
 
 # Auto_dev
@@ -24,7 +24,7 @@ Use conditional reading for everything else:
 * read `.ark/rules/` only for the rule file that matches your task type,
 * read `.ark/init.sh` only when the task type needs runtime startup or verification,
 * read `.ark/lessons.json` if it exists and is non-empty — scan for known pitfalls before dispatch,
-* read `.ark/project_goal.md` if it exists — note the acceptance criteria for post-batch verification.
+* read `.ark/project_goal.md` if it exists — record the `## Mode` field (`workflow`, `agent`, or `loop`) and the acceptance criteria for post-batch steps; default to `loop` if mode is absent.
 
 ## Memory-aware startup policy
 * Use injected memories for stable project conventions, pitfalls, and project shape hints.
@@ -34,7 +34,7 @@ Use conditional reading for everything else:
 
 ## Parent agent workflow
 
-1. Parse how many tasks the user wants completed. If omitted, run the full loop until all acceptance criteria pass or the queue empties.
+1. Read `.ark/project_goal.md` if it exists. Record the `## Mode` value: `workflow`, `agent`, or `loop`. Default to `loop` if absent, unset, or the file does not exist. Parse how many tasks the user wants completed; if omitted, run until the stopping condition for the active mode (see step 23).
 2. Run a memory-layer health check before dispatch:
    * if `.ark/codex-progress.md` is too long for default startup,
    * or `.ark/agent-state.md` is missing or clearly stale,
@@ -59,7 +59,7 @@ Use conditional reading for everything else:
    b. **Task-to-tier mapping**: `docs`/`planning` → fast, `frontend`/`backend` → default, `e2e` → capable.
    c. **Platform fallback**: if the platform does not support specifying a model for sub-agents, apply instruction routing only — all workers use the current session model but still receive the appropriate lightweight or full execution instructions for their task type.
    d. Dispatch each worker with the resolved model. Tell every worker they are not alone in the codebase and must stay inside their assigned write scope.
-10. For each dispatched task, pass only: `task_id`, description, `task_type`, `budget_minutes`, `steps`, expected write scope, the escalation contract, and any entries from `.ark/lessons.json` directly relevant to this task (distilled by the parent before dispatch — workers do not read `lessons.json` themselves).
+10. For each dispatched task, pass only: `task_id`, description, `task_type`, `budget_minutes`, `steps`, expected write scope, the escalation contract, the active **mode**, and any entries from `.ark/lessons.json` directly relevant to this task (distilled by the parent before dispatch — workers do not read `lessons.json` themselves).
 11. For a `docs` or `planning` task, enforce a hard timeout equal to `budget_minutes`.
 12. Wait for the current dependency layer to finish before dispatching tasks that depend on it.
 13. If a `docs` or `planning` task exceeds its budget or requires the heavy path, escalate as `task-process-mismatch`.
@@ -83,13 +83,18 @@ Use conditional reading for everything else:
 21. If the third commit attempt fails or a remote operation fails under escalation, stop as `post-processing-blocked`.
 22. Continue by dependency layer until the requested number of tasks is complete or an escalation occurs.
 23. **Post-batch steps** (run after each batch completes or queue empties):
-    a. **Lesson extraction**: collect any `discoveries` returned by workers. Append each new discovery to `.ark/lessons.json` (skip entries whose `lesson` text already exists). Record only non-obvious facts that would otherwise require rediscovery: architecture corrections, environment gotchas, recurring patterns.
-    b. **Criteria check**: if `.ark/project_goal.md` exists and has acceptance criteria, verify each criterion using the appropriate method (shell command, API call, browser check, or file check). Mark passing criteria with `[x]` and record the per-criterion result under `## Last Check`.
-    c. **Loop decision**:
-       * If all criteria pass: update `project_goal.md` status to `done` and report completion. Stop.
-       * If criteria remain unmet and the queue still has pending tasks: continue dispatching (return to step 3).
-       * If criteria remain unmet and the queue is empty: generate a gap analysis (which criteria failed, what is still missing), write it under `## Gap Analysis` in `project_goal.md`, then invoke `$Task_init` in `rewrite-pending` mode with the gap analysis as context. After `$Task_init` writes new tasks, return to step 3 to begin the next cycle. Stop if the same criterion has failed in 3 consecutive gap-analysis cycles.
-       * If `project_goal.md` does not exist: report queue status and stop normally.
+    a. **Lesson extraction** (all modes): collect any `discoveries` returned by workers. Append each new discovery to `.ark/lessons.json` (skip entries whose `lesson` text already exists). Record only non-obvious facts that would otherwise require rediscovery: architecture corrections, environment gotchas, recurring patterns.
+    b. **Mode-specific stopping logic**:
+       * **`workflow` mode**: when the requested task count is reached or the queue is empty, report which tasks completed and stop. Do not check acceptance criteria. Do not re-plan.
+       * **`agent` mode**: when the requested task count is reached or the queue is empty, run a single quality check — review the changes made across all accepted tasks and confirm they address the original requirement as stated in `project_goal.md`. Report any gaps or concerns, then stop. Do not invoke `$Task_init` or re-plan.
+       * **`loop` mode**: run the full criteria-and-replan cycle:
+         i. **Criteria check**: if `.ark/project_goal.md` exists and has acceptance criteria, verify each criterion using the appropriate method (shell command, API call, browser check, or file check). Mark passing criteria with `[x]` and record per-criterion results under `## Last Check`.
+         ii. **Loop decision**:
+             - All criteria pass → update `project_goal.md` status to `done`, report completion, stop.
+             - Criteria unmet, queue has pending tasks → continue dispatching (return to step 3).
+             - Criteria unmet, queue empty → generate a gap analysis (which criteria failed, what is still missing), write it under `## Gap Analysis` in `project_goal.md`, invoke `$Task_init` in `rewrite-pending` mode with the gap analysis as context, return to step 3. Stop if the same criterion has failed in 3 consecutive gap-analysis cycles.
+             - No `project_goal.md` or no criteria → report queue status and stop.
+       * **Mode absent or unknown**: treat as `loop`.
 
 ## Skill boundaries
 
@@ -132,6 +137,14 @@ Default budgets:
 Workers return: validation evidence, changed file list, suggested commit message, and an optional `discoveries` list (new non-obvious project facts found during this task — keep it short).
 
 Workers must NOT mutate `.ark/feature_list.json`, `.ark/agent-state.md`, `.ark/codex-progress.md`, or `.ark/lessons.json`. The parent owns all coordination file updates.
+
+### Mode overlay (applied on top of the execution path for every worker)
+
+Read the active mode from the task briefing and adjust behavior accordingly:
+
+* **`workflow`** — execute the assigned steps exactly as described. Do not explore beyond the assigned scope. Do not investigate unrelated code. Return evidence that each step completed as described.
+* **`agent`** — reason through the task before acting. Investigate the relevant code to understand the root cause or best approach before writing any changes. Return your reasoning chain alongside the implementation and validation evidence. If you discover that the task description is wrong or incomplete, include that finding in `discoveries`.
+* **`loop`** — implement the assigned task and validate strictly against each declared step using the real execution path. Report every failing step explicitly. Do not expand scope.
 
 ### Lightweight fast path (docs / planning)
 1. Read `AGENTS.md`, then `.ark/agent-state.md` if it exists, then the assigned task.
