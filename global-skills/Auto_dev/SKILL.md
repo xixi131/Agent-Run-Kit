@@ -51,12 +51,15 @@ Use conditional reading for everything else:
    * tasks are dependent when one produces files, APIs, schemas, state, or UI surfaces that another consumes,
    * tasks are not safe to parallelize when write scopes overlap or both need broad refactors in the same module,
    * tasks may run in parallel when they have independent outcomes and disjoint write scopes.
-9. Dispatch the first dependency layer. Route workers by task type and model preference:
-   * `docs` / `planning` → prefer a fast, low-cost model (e.g., claude-haiku-4-5),
-   * `frontend` / `backend` → use the current session model,
-   * `e2e` → prefer the most capable model available (e.g., claude-sonnet-5).
-   * Tell every worker they are not alone in the codebase and must stay inside their assigned write scope.
-10. For each dispatched task, pass only: `task_id`, description, `task_type`, `budget_minutes`, `steps`, expected write scope, and the escalation contract.
+9. Resolve model tiers, then dispatch the first dependency layer:
+   a. **Tier resolution**: read `.ark/model_config.json` if it exists.
+      * `fast` tier — use `tiers.fast` if set; otherwise infer the lightweight model for your current provider (e.g., Haiku for Anthropic, gpt-4o-mini for OpenAI).
+      * `default` tier — always the current session model; never overridden.
+      * `capable` tier — use `tiers.capable` if set; otherwise infer the most capable available model for your current provider (e.g., claude-sonnet-5 for Anthropic, o1 for OpenAI).
+   b. **Task-to-tier mapping**: `docs`/`planning` → fast, `frontend`/`backend` → default, `e2e` → capable.
+   c. **Platform fallback**: if the platform does not support specifying a model for sub-agents, apply instruction routing only — all workers use the current session model but still receive the appropriate lightweight or full execution instructions for their task type.
+   d. Dispatch each worker with the resolved model. Tell every worker they are not alone in the codebase and must stay inside their assigned write scope.
+10. For each dispatched task, pass only: `task_id`, description, `task_type`, `budget_minutes`, `steps`, expected write scope, the escalation contract, and any entries from `.ark/lessons.json` directly relevant to this task (distilled by the parent before dispatch — workers do not read `lessons.json` themselves).
 11. For a `docs` or `planning` task, enforce a hard timeout equal to `budget_minutes`.
 12. Wait for the current dependency layer to finish before dispatching tasks that depend on it.
 13. If a `docs` or `planning` task exceeds its budget or requires the heavy path, escalate as `task-process-mismatch`.

@@ -82,6 +82,7 @@ AGENTS.md                              ← project root (auto-loaded by Codex)
   feature_list.json
   final_feature_list.json
   lessons.json
+  model_config.json
   project_goal.md
   init.sh
   rules/

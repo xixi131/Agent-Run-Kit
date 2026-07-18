@@ -1,0 +1,12 @@
+{
+  "_readme": "Optional. If tiers are null, $Auto_dev infers models from your current provider. Set fast or capable to lock specific model versions or override auto-inference.",
+  "_examples": {
+    "anthropic": { "fast": "claude-haiku-4-5-20251001", "capable": "claude-sonnet-5" },
+    "openai":    { "fast": "gpt-4o-mini",               "capable": "o1" },
+    "google":    { "fast": "gemini-1.5-flash",          "capable": "gemini-2.0-pro" }
+  },
+  "tiers": {
+    "fast": null,
+    "capable": null
+  }
+}
