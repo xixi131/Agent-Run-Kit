@@ -26,7 +26,7 @@ description: 任务初始化工作流：把新需求拆解成有序、可执行�
 1. 先读取 `AGENTS.md`。
 2. 读取用户提供的需求说明。
 3. 读取当前 `feature_list.json` 和 `codex-progress.md`。
-4. 只按需读取相关的 `project_DS/specification/` 文档。
+4. 只按需读取 `.ark/rules/` 里与当前任务类型对应的规范文件。
 5. 判断本次队列更新模式：
    * `replace-active`：归档当前 active 队列，清空后写入新队列，
    * `rewrite-pending`：保留已完成 active 任务，归档被替换的未完成任务，再写入重新规划的未完成队列，

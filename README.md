@@ -29,7 +29,7 @@ global-skills/Context_archive
 
 - `AGENTS.md`：写项目摘要、核心规则、文档路由。
 - `init.sh`：改成这个项目真实的启动或验证命令；模板里的占位脚本会故意失败退出。
-- `project_DS/specification/*`：替换成项目自己的前端、UI、后端、架构规范。
+- `.ark/rules/*`：替换成项目自己的前端、UI、后端、架构规范。
 - `feature_list.json`：保持空数组，后续交给 `$Task_init` 生成当前任务队列。
 - `final_feature_list.json`：保持空数组，`$Task_init` 会把旧队列追加到这里。
 
@@ -85,7 +85,7 @@ $Context_archive 压缩当前项目记忆层并刷新 agent-state.md
 
 `AGENTS.md` 不要写太长。
 
-推荐只放项目摘要、关键业务规则和文档路由。详细规范拆到 `project_DS/specification/`，然后在 `AGENTS.md` 里告诉代理什么时候读取哪个文件。
+推荐只放项目摘要、关键业务规则和文档路由。详细规范拆到 `.ark/rules/`，然后在 `AGENTS.md` 的 Doc Routing 里注明"写什么类型的代码才读哪个文件"。
 
 这样可以减少默认上下文，节省 token，也能让代理启动更快、注意力更集中。
 
