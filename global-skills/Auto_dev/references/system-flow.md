@@ -33,7 +33,7 @@ Codex Memories may also provide useful recalled context from previous threads. T
 9. `docs` and `planning` tasks use a lightweight fast path with a hard timeout. `frontend`, `backend`, and `e2e` tasks use the full execution path.
 10. The parent agent dispatches one worker per task in the current dependency layer, passing each worker only its `task_id`, task, typed execution contract, validation steps, expected write scope when inferable, and escalation contract.
 11. Workers must start from the same minimal set: `AGENTS.md`, `agent-state.md` if present, and the assigned task in `feature_list.json`.
-12. Workers read `codex-progress.md`, `codex-progress-archive.md`, `project_DS`, and other repository files only when the task actually needs more context.
+12. Workers read `codex-progress.md`, `codex-progress-archive.md`, `.ark/rules/`, and other repository files only when the task actually needs more context.
 13. For a pure `docs` or `planning` task, the worker skips heavy startup and only performs lightweight validation such as file existence, section structure, and path discoverability.
 14. For a `docs` or `planning` task, the parent agent must reclaim the worker as soon as `budget_minutes` is reached. It does not wait for natural completion.
 15. For `frontend`, `backend`, and `e2e` tasks, the worker reads only the minimum additional local context, runs `init.sh`, implements the task, validates each declared step through the real execution path, and self-repairs at most 3 times for the same symptom.
