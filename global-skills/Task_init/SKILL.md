@@ -74,6 +74,10 @@ Use conditional reading for everything else:
 13. Write the updated active queue into `.ark/feature_list.json` using the repository schema. If `project_goal.md` was created or updated, confirm its `## Mode` is set and (for `loop` mode) `## Acceptance Criteria` is non-empty before finishing.
 14. Refresh `.ark/agent-state.md` when the queue shape or next recommended read path has materially changed.
 15. Summarize the inferred or confirmed execution mode, the selected queue update mode, what was moved into `final_feature_list.json`, the generated task groups, major assumptions, and any risks.
+16. Remind the user to review `.ark/project_goal.md` before running `$Auto_dev`. Explain what the file is in plain language:
+    * It records **what you want to achieve** (Requirement), **how the system will run** (Mode: workflow / agent / loop), and **how success is measured** (Acceptance Criteria).
+    * In `loop` mode, `$Auto_dev` uses the Acceptance Criteria to decide whether to keep iterating or stop — so inaccurate criteria will cause it to loop too long or stop too early.
+    * The user should verify the Mode is correct and that every criterion is specific enough to be verified automatically (by browser, API call, or shell command). Vague criteria like "it works" cannot be checked and will be skipped.
 
 ## Skill boundaries
 
