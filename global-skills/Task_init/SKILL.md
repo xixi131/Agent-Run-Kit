@@ -39,7 +39,7 @@ Use conditional reading for everything else:
      - `workflow` — the requirement is a deterministic one-time operation with no measurable "done" state beyond task completion. Signal words: migrate, convert, generate, format, batch, rename, move.
      - `agent` — the requirement calls for investigation or a single-pass fix that requires reasoning but not iterative re-planning. Signal words: debug, fix, refactor, optimize, investigate, diagnose, find why.
      - `loop` — the requirement describes a feature or product capability with verifiable acceptance criteria. Signal words: implement, build, create, add feature, develop, make it possible to.
-   * For `loop` mode, if `## Acceptance Criteria` in `project_goal.md` is empty or placeholder-only, draft verifiable criteria from the requirement. Each criterion must be observable by browser, API call, or shell check — not vague. Leave drafting to the user if the requirement lacks enough specifics to write testable criteria.
+   * For `loop` mode, if `## Acceptance Criteria` in `project_goal.md` is empty or placeholder-only, draft verifiable criteria from the requirement. Each criterion must be written as a concrete shell command that exits 0 on success, for example: `` `curl -sf http://localhost:3000/api/health` exits 0 `` or `` `npm test 2>&1 | grep "passing"` exits 0 ``. Do not write vague prose like "user can log in" — write the command that proves it. Leave drafting to the user if the requirement lacks enough specifics to write a testable command.
 2. Run a memory-layer health check before planning:
    * if `.ark/codex-progress.md` is too long for default startup,
    * or `.ark/agent-state.md` is missing or clearly stale,

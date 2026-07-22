@@ -1,92 +1,161 @@
 # Agent-Run-Kit
 
-这是一套可复用的 Codex 自动开发工作流模板，主要由两部分组成：
+一套可复用的多代理自动开发工作流模板，兼容 Claude Code 和 Codex。
 
-- `global-skills/`：三个全局 skills，复制到 `~/.codex/skills/` 使用。
-- `project-template/`：项目级记忆层模板，复制到目标项目根目录使用。
+核心思路：用三个全局 skill 驱动一个文件级记忆层，让 AI 代理能在任意项目里自主拆任务、执行、验证、记录、提交，并根据验收标准决定是否继续迭代。
 
-## 安装全局 skills
+---
 
-把下面三个目录复制到对方电脑的 `~/.codex/skills/`：
+## 组成
 
-```text
+```
+global-skills/       ← 三个全局 skill，安装后全项目可用
+  Auto_dev/          ← 任务调度、执行、验证、提交
+  Task_init/         ← 需求拆分为可执行任务队列
+  Context_archive/   ← 记忆层过长时压缩归档
+
+project-template/    ← 复制到目标项目的记忆层模板
+  AGENTS.md          ← 项目稳定事实、规则、文档路由
+  .ark/
+    project_goal.md  ← 执行目标、运行模式、验收标准
+    feature_list.json
+    agent-state.md
+    init.sh
+    rules/
+    ...
+```
+
+---
+
+## 安装
+
+### 1. 全局 skills
+
+把 `global-skills/` 下三个目录复制到 `~/.claude/skills/`（Claude Code）或 `~/.codex/skills/`（Codex）：
+
+```
 global-skills/Auto_dev
 global-skills/Task_init
 global-skills/Context_archive
 ```
 
-它们分别负责：
+### 2. 项目模板
 
-- `$Task_init`：把需求按阶段拆成可执行任务。
-- `$Auto_dev`：按任务队列调度子代理执行、验证、记录、提交。
-- `$Context_archive`：上下文变长时，压缩记忆层并保留历史归档。
+把 `project-template/` 里的内容复制到目标项目根目录，然后修改：
 
-## 安装项目模板
+- `AGENTS.md`：写项目摘要、核心规则、文档路由
+- `.ark/init.sh`：改成项目真实的启动或验证命令
+- `.ark/rules/*`：替换成项目自己的前端、后端、架构规范
+- `.ark/project_goal.md`：填写需求、选择运行模式、写验收标准
 
-把 `project-template/` 里的内容复制到目标项目根目录。
+---
 
-复制后重点改这几处：
+## 三种运行模式
 
-- `AGENTS.md`：写项目摘要、核心规则、文档路由。
-- `init.sh`：改成这个项目真实的启动或验证命令；模板里的占位脚本会故意失败退出。
-- `.ark/rules/*`：替换成项目自己的前端、UI、后端、架构规范。
-- `feature_list.json`：保持空数组，后续交给 `$Task_init` 生成当前任务队列。
-- `final_feature_list.json`：保持空数组，`$Task_init` 会把旧队列追加到这里。
+通过 `.ark/project_goal.md` 的 `## Mode` 字段控制，`$Auto_dev` 据此调整行为。
 
-## 推荐使用流程
+### workflow — 确定性流程
 
-先让 AI 根据需求写一个阶段计划。
+适合一次性操作：迁移、格式化、批量重命名等。
 
-然后用 `$Task_init` 按阶段拆任务：
+- worker 按步骤逐一执行，不探索范围外的代码
+- worker 必须输出步骤完成块，parent 逐条核验：
+  ```
+  [✓] step 1: migration ran, users table exists
+  [✓] step 2: sessions table exists
+  [✗] step 3: idempotent rerun failed — error: table already exists
+  ```
+- 任务完成后直接停止，不检查验收标准，不重新规划
 
-```text
-$Task_init 根据第一阶段计划拆成可执行任务
+### agent — 单次推理执行
+
+适合调查型任务：debug、fix、refactor、optimize。
+
+- worker 必须先输出调查摘要再开始实现：
+  ```
+  [INVESTIGATION] read: auth/middleware.ts, sessions/store.ts | finding: token stored in localStorage, not httpOnly cookie
+  ```
+- 执行完成后做一次整体质量复查，报告差距后停止
+- 不重新规划，不迭代
+
+### loop — 验收驱动迭代
+
+适合功能开发：implement、build、add feature。
+
+- 每轮执行完成后，`$Auto_dev` 运行验收标准中的 shell 命令：
+  ```
+  - [ ] `curl -sf http://localhost:3000/api/health` exits 0
+  - [ ] `npm test 2>&1 | grep "passing"` exits 0
+  ```
+- 标准全部通过 → 停止
+- 未通过 → 写 Gap Analysis 到 `project_goal.md` → 调用 `$Task_init` 重新规划未完成任务 → 继续执行
+- 同一标准连续失败 3 次 → 停止并上报
+
+验收标准必须写成可执行的 shell 命令（exit 0 为通过），不接受"用户能登录"这类模糊描述。
+
+---
+
+## 使用流程
+
+**第一步：填写目标**
+
+在 `.ark/project_goal.md` 里写清楚需求、选好模式、写好验收标准（loop 模式必填）。
+
+**第二步：拆任务**
+
+```
+$Task_init 根据需求拆成可执行任务
 ```
 
-再用 `$Auto_dev` 执行任务：
+`$Task_init` 会：
+- 把需求拆成有 `task_id`、`task_type`、`budget_minutes`、`steps` 的任务写入 `feature_list.json`
+- 如果是 loop 模式且验收标准为空，会帮你起草可执行标准（需人工确认后再跑 `$Auto_dev`）
+- 支持三种队列模式：`replace-active`、`rewrite-pending`、`append-phase`
 
-```text
+**第三步：执行**
+
+```
 $Auto_dev 完成 1 个任务
 ```
 
-稳定后可以一次执行多个任务：
+稳定后可批量执行：
 
-```text
+```
 $Auto_dev 完成 3 个任务
 ```
 
-`$Task_init` 写入的任务应包含稳定唯一的 `task_id`、`task_type`、`budget_minutes` 和 `passes`。
+`$Auto_dev` 会：
+- 分析任务依赖关系，写入范围不冲突的任务并行执行，有依赖的顺序执行
+- worker 只实现和返回验证证据，parent 统一更新记忆层文件并提交 commit
+- loop 模式下自动检查验收标准，未通过则调用 `$Task_init` 重新规划并继续
 
-`$Task_init` 支持三种队列更新模式：
+**上下文过长时压缩：**
 
-- `replace-active`：归档当前 active 队列，清空后写入新队列。
-- `rewrite-pending`：保留已完成任务，归档被替换的未完成任务，再写入重新规划的未完成队列。
-- `append-phase`：保留当前 active 队列，并把新阶段任务追加到队列末尾。
-
-`$Auto_dev` 会先判断任务之间有没有依赖关系。没有依赖、写入范围不冲突的任务会并行派发；有依赖的任务会按顺序执行。并行执行时，worker 只负责实现和返回验证证据，父代理统一更新 `feature_list.json`、`agent-state.md`、`codex-progress.md` 并提交 commit。
-
-上下文变长时，用：
-
-```text
+```
 $Context_archive 压缩当前项目记忆层并刷新 agent-state.md
 ```
 
-## 记忆层文件
+---
 
-- `AGENTS.md`：项目稳定事实、核心规则、按需读文档的路由。
-- `feature_list.json`：当前 active 任务队列，每个任务应包含稳定唯一的 `task_id`。
-- `final_feature_list.json`：历史任务队列归档，由 `$Task_init` 追加写入。
-- `agent-state.md`：当前交接状态。
-- `codex-progress.md`：近期进度日志。
-- `codex-progress-archive.md`：更早的详细历史。
-- `init.sh`：项目启动或验证入口。
+## 记忆层文件说明
 
-## 一个建议
+| 文件 | 用途 |
+|------|------|
+| `AGENTS.md` | 项目稳定事实、核心规则、文档路由，代理启动时默认读取 |
+| `.ark/project_goal.md` | 执行目标、运行模式（workflow/agent/loop）、验收标准 |
+| `.ark/feature_list.json` | 当前 active 任务队列，`passes: false` 为待执行 |
+| `.ark/final_feature_list.json` | 历史任务归档 |
+| `.ark/agent-state.md` | 当前交接状态，代理启动优先读此文件 |
+| `.ark/codex-progress.md` | 近期进度日志 |
+| `.ark/codex-progress-archive.md` | 更早的详细历史，按需读取 |
+| `.ark/lessons.json` | 已发现的非显而易见事实，下次派发前注入给 worker |
+| `.ark/init.sh` | 项目启动或验证入口 |
+| `.ark/rules/` | 分类规范文件，按任务类型按需读取 |
 
-`AGENTS.md` 不要写太长。
+---
 
-推荐只放项目摘要、关键业务规则和文档路由。详细规范拆到 `.ark/rules/`，然后在 `AGENTS.md` 的 Doc Routing 里注明"写什么类型的代码才读哪个文件"。
+## AGENTS.md 写法建议
 
-这样可以减少默认上下文，节省 token，也能让代理启动更快、注意力更集中。
+只放项目摘要、关键业务规则和文档路由，不要把所有规范堆进来。
 
-友链：[linux.do](https://linux.do/)
+详细规范拆到 `.ark/rules/`，在 `AGENTS.md` 的 Doc Routing 里注明"写什么类型的代码读哪个文件"。这样可以减少默认上下文，节省 token，让代理注意力更集中。

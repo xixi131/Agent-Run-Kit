@@ -65,8 +65,9 @@ Use conditional reading for everything else:
 13. If a `docs` or `planning` task exceeds its budget or requires the heavy path, escalate as `task-process-mismatch`.
 14. If any worker reports an escalation, stop immediately and wait for the user to resolve the blocker.
 15. Accept each worker result only if all of the following are true:
-    * the worker reports validation against every listed step,
-    * the worker reports the concrete verification path used,
+    * **`workflow` mode**: the result contains a step completion block where every step is `[✓]`; reject if any step is `[✗]` or the block is absent,
+    * **`agent` mode**: the result contains an `[INVESTIGATION]` block before the implementation; reject if the block is absent,
+    * **`loop` mode**: the worker reports the concrete verification path used for each declared step,
     * changed files stay inside the task-scoped write responsibility,
     * the worker did not mutate shared coordination files.
 16. Parent performs all shared state updates for accepted tasks:
@@ -88,7 +89,7 @@ Use conditional reading for everything else:
        * **`workflow` mode**: when the requested task count is reached or the queue is empty, report which tasks completed and stop. Do not check acceptance criteria. Do not re-plan.
        * **`agent` mode**: when the requested task count is reached or the queue is empty, run a single quality check — review the changes made across all accepted tasks and confirm they address the original requirement as stated in `project_goal.md`. Report any gaps or concerns, then stop. Do not invoke `$Task_init` or re-plan.
        * **`loop` mode**: run the full criteria-and-replan cycle:
-         i. **Criteria check**: if `.ark/project_goal.md` exists and has acceptance criteria, verify each criterion using the appropriate method (shell command, API call, browser check, or file check). Mark passing criteria with `[x]` and record per-criterion results under `## Last Check`.
+         i. **Criteria check**: if `.ark/project_goal.md` exists and has acceptance criteria, run each criterion's shell command via the Bash tool and record the actual exit code and output. A criterion passes only if the command exits 0. Do NOT evaluate criteria from reasoning alone — every criterion must produce a real Bash tool result before it can be marked passing. Mark passing criteria with `[x]` and record per-criterion command, exit code, and output snippet under `## Last Check`.
          ii. **Loop decision**:
              - All criteria pass → update `project_goal.md` status to `done`, report completion, stop.
              - Criteria unmet, queue has pending tasks → continue dispatching (return to step 3).
@@ -142,8 +143,20 @@ Workers must NOT mutate `.ark/feature_list.json`, `.ark/agent-state.md`, `.ark/c
 
 Read the active mode from the task briefing and adjust behavior accordingly:
 
-* **`workflow`** — execute the assigned steps exactly as described. Do not explore beyond the assigned scope. Do not investigate unrelated code. Return evidence that each step completed as described.
-* **`agent`** — reason through the task before acting. Investigate the relevant code to understand the root cause or best approach before writing any changes. Return your reasoning chain alongside the implementation and validation evidence. If you discover that the task description is wrong or incomplete, include that finding in `discoveries`.
+* **`workflow`** — execute the assigned steps exactly as described. Do not explore beyond the assigned scope. Do not investigate unrelated code. Before returning, output a step completion block in this exact format — one line per step, no prose:
+  ```
+  [✓] step 1: <one-line evidence>
+  [✓] step 2: <one-line evidence>
+  [✗] step 3: <one-line failure reason>
+  ```
+  All steps must be `[✓]` before the result is returnable. If any step is `[✗]`, attempt self-repair (max 3 times) or escalate.
+
+* **`agent`** — before writing any code, output an investigation block in this exact format:
+  ```
+  [INVESTIGATION] read: <comma-separated files> | finding: <one sentence root cause or best approach>
+  ```
+  Then implement and validate. If you discover that the task description is wrong or incomplete, include that finding in `discoveries`.
+
 * **`loop`** — implement the assigned task and validate strictly against each declared step using the real execution path. Report every failing step explicitly. Do not expand scope.
 
 ### Lightweight fast path (docs / planning)
