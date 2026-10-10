@@ -1,6 +1,6 @@
 ---
 name: Auto_dev
-description: Coordinate a parent-child multi-agent execution loop for this repository. Reads the execution mode (workflow / agent / loop) from .ark/project_goal.md and adapts stopping behavior accordingly. Dispatches workers by task type and model tier, verifies results, updates coordination files, and in loop mode checks acceptance criteria with gap-analysis replanning until all criteria pass or an escalation occurs.
+description: Coordinate a parent-child multi-agent execution loop for this repository. Reads the execution mode (workflow / agent / loop) from .ark/project_goal.md and adapts stopping behavior accordingly. Dispatches workers by task type with a model chosen per task difficulty, verifies results, updates coordination files, and in loop mode checks acceptance criteria with gap-analysis replanning until all criteria pass or an escalation occurs.
 ---
 
 # Auto_dev
@@ -51,19 +51,20 @@ Use conditional reading for everything else:
    * tasks are dependent when one produces files, APIs, schemas, state, or UI surfaces that another consumes,
    * tasks are not safe to parallelize when write scopes overlap or both need broad refactors in the same module,
    * tasks may run in parallel when they have independent outcomes and disjoint write scopes.
-9. Resolve model tiers, then dispatch the first dependency layer:
-   a. **Tier resolution**: read `.ark/model_config.json` if it exists.
-      * `fast` tier — use `tiers.fast` if set; otherwise infer the lightweight model for your current provider (e.g., Haiku for Anthropic, gpt-4o-mini for OpenAI).
-      * `default` tier — always the current session model; never overridden.
-      * `capable` tier — use `tiers.capable` if set; otherwise infer the most capable available model for your current provider (e.g., claude-sonnet-5 for Anthropic, o1 for OpenAI).
-   b. **Task-to-tier mapping**: `docs`/`planning` → fast, `frontend`/`backend` → default, `e2e` → capable.
-   c. **Platform fallback**: if the platform does not support specifying a model for sub-agents, apply instruction routing only — all workers use the current session model but still receive the appropriate lightweight or full execution instructions for their task type.
-   d. Dispatch each worker with the resolved model. Tell every worker they are not alone in the codebase and must stay inside their assigned write scope.
+9. Choose a model per task, then dispatch the first dependency layer:
+   a. **Judge difficulty from the task itself**, not from `task_type` alone:
+      * `light` — mechanical, well-specified, single-file or doc-only work.
+      * `normal` — ordinary feature or fix work with a clear approach.
+      * `heavy` — cross-layer changes, unclear root cause, broad refactors, or a task that already failed once.
+   b. **Map difficulty to a model available on the current platform** (Claude Code, Codex, etc.): `light` → the platform's lightweight model, `normal` → the current session model, `heavy` → the strongest model available. Never pick a model the platform does not offer, and never pick a `heavy` model weaker than the session model.
+   c. **Optional pins**: if `.ark/model_config.json` sets `tiers.light` or `tiers.heavy` and that model belongs to the current platform, use it for that level; otherwise ignore the pin.
+   d. **When unsure**, or when the platform cannot set a sub-agent model, use the current session model.
+   e. Dispatch each worker with the chosen model. Tell every worker they are not alone in the codebase and must stay inside their assigned write scope.
 10. For each dispatched task, pass only: `task_id`, description, `task_type`, `budget_minutes`, `steps`, expected write scope, the escalation contract, the active **mode**, and any entries from `.ark/lessons.json` directly relevant to this task (distilled by the parent before dispatch — workers do not read `lessons.json` themselves).
 11. For a `docs` or `planning` task, enforce a hard timeout equal to `budget_minutes`.
 12. Wait for the current dependency layer to finish before dispatching tasks that depend on it.
 13. If a `docs` or `planning` task exceeds its budget or requires the heavy path, escalate as `task-process-mismatch`.
-14. If any worker reports an escalation, stop immediately and wait for the user to resolve the blocker.
+14. If any worker reports an escalation, stop immediately and wait for the user to resolve the blocker. Exception: if the worker ran on a model lighter than `heavy`, retry the task once on the `heavy` model before stopping.
 15. Accept each worker result only if all of the following are true:
     * **`workflow` mode**: the result contains a step completion block where every step is `[✓]`; reject if any step is `[✗]` or the block is absent,
     * **`agent` mode**: the result contains an `[INVESTIGATION]` block before the implementation; reject if the block is absent,
@@ -73,7 +74,7 @@ Use conditional reading for everything else:
 16. Parent performs all shared state updates for accepted tasks:
     * set each accepted `task_id` in `.ark/feature_list.json` to `"passes": true`,
     * refresh `.ark/agent-state.md` when the first pending task or startup read path changes,
-    * append one fresh log entry per accepted task to `.ark/codex-progress.md`.
+    * append one fresh log entry per accepted task to `.ark/codex-progress.md`, including the model used.
 17. Parent verifies acceptance after the shared state update:
     * every accepted `task_id` is now `"passes": true`,
     * `.ark/codex-progress.md` has a fresh matching entry,

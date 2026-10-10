@@ -1,12 +1,11 @@
 {
-  "_readme": "Optional. If tiers are null, $Auto_dev infers models from your current provider. Set fast or capable to lock specific model versions or override auto-inference.",
+  "_readme": "Optional. $Auto_dev picks a model per task difficulty (light / normal / heavy) from what the current platform offers; normal always uses the session model. Set light or heavy only to pin a model; a pin from a different platform is ignored, so null is the safe default for projects used in both Claude Code and Codex.",
   "_examples": {
-    "anthropic": { "fast": "claude-haiku-4-5-20251001", "capable": "claude-sonnet-5" },
-    "openai":    { "fast": "gpt-4o-mini",               "capable": "o1" },
-    "google":    { "fast": "gemini-1.5-flash",          "capable": "gemini-2.0-pro" }
+    "claude_code": { "light": "haiku",        "heavy": "opus" },
+    "codex":       { "light": "gpt-5.6-luna", "heavy": "gpt-5.6-sol" }
   },
   "tiers": {
-    "fast": null,
-    "capable": null
+    "light": null,
+    "heavy": null
   }
 }
