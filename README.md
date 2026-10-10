@@ -159,3 +159,7 @@ $Context_archive 压缩当前项目记忆层并刷新 agent-state.md
 只放项目摘要、关键业务规则和文档路由，不要把所有规范堆进来。
 
 详细规范拆到 `.ark/rules/`，在 `AGENTS.md` 的 Doc Routing 里注明"写什么类型的代码读哪个文件"。这样可以减少默认上下文，节省 token，让代理注意力更集中。
+
+---
+
+友链：[linux.do](https://linux.do)
