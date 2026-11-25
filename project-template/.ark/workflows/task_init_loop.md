@@ -110,9 +110,17 @@ description: 任务初始化工作流：把新需求拆解成有序、可执行�
 示例：
 
 ```text
-$Task_init 根据“主播考勤导入和周结算”需求拆成 12 个任务并写入 feature_list.json
+$Task_init 根据”主播考勤导入和周结算”需求拆成 12 个任务并写入 feature_list.json
 ```
 
 ```text
 $Task_init 根据最新 PRD 重写 feature_list.json 中未完成项，保留已完成项
 ```
+
+## 运行 $Auto_dev 前检查 project_goal.md
+
+`$Task_init` 完成后，在运行 `$Auto_dev` 之前，请先确认 `.ark/project_goal.md` 内容正确：
+
+- **Requirement**：确认描述准确反映了你的目标。
+- **Mode**：确认执行模式正确（`workflow` / `agent` / `loop`）。
+- **Acceptance Criteria**（loop 模式专用）：每条标准必须能被自动验证（浏览器操作、API 调用或 shell 命令）。模糊的标准（如”可以正常使用”）无法被检查，会被跳过，导致 loop 过早停止或持续运行过长。

@@ -16,16 +16,16 @@ description: 父子 Agent 协作模式：读取 feature_list.json 状态机，�
 - `feature_list.json` 负责任务状态机。
 - `codex-progress.md` 负责人类与 agent 共用的工作日志。
 - `init.sh` 负责环境初始化和启动安全线。
-- `.agents/skills/auto_dev/` 负责触发这套自动开发系统。
+- `global-skills/Auto_dev` 负责触发这套自动开发系统。
 - `.ark/workflows/auto_dev_loop.md` 负责解释整套流程。
 
 ### 人类如何使用
 
-1. 如果是新需求，先用 `$task-init` 把需求拆成 `feature_list.json` 任务队列。
+1. 如果是新需求，先用 `$Task_init` 把需求拆成 `feature_list.json` 任务队列。
 2. 再维护 `codex-progress.md`，保留最近的重要上下文。
-3. 在仓库里用 `$auto_dev 完成 1 个任务` 或 `$auto_dev 完成 2 个任务` 触发父代理。
+3. 在仓库里用 `$Auto_dev 完成 1 个任务` 或 `$Auto_dev 完成 2 个任务` 触发父代理。
 4. 父代理会读取状态机，派发子代理处理第一个 `passes: false` 的任务。
-5. 子代理完成后会更新状态、写日志、提交 commit。
+5. 子代理完成后会返回验证证据和变更清单；父代理更新状态、写日志并提交 commit。
 6. 如果失败超过阈值，系统会停止并请求人工介入。
 
 ### 人类需要重点维护什么
@@ -39,12 +39,12 @@ description: 父子 Agent 协作模式：读取 feature_list.json 状态机，�
 
 ### Core Roles
 1. **Supervisor (Parent Agent)**: task dispatch, state-machine validation, acceptance, and progress reporting.
-2. **Worker (Child Agent)**: targeted implementation, validation, state update, and task-level Git commit.
+2. **Worker (Child Agent)**: targeted implementation, validation, and evidence reporting.
 
 ### Canonical Coordination Files
 * `AGENTS.md`: default-loaded project constitution and worker SOP.
-* `feature_list.json`: task state machine. Dispatch only items with `"passes": false`.
-* `codex-progress.md`: shared work log. Append one entry per completed task.
+* `feature_list.json`: task state machine. Dispatch only items with `"passes": false`; every task should include a stable `task_id`.
+* `codex-progress.md`: shared work log. The parent appends one entry per accepted task.
 * `init.sh`: environment initialization entrypoint before validation.
 
 ### Supervisor Loop
@@ -53,16 +53,19 @@ description: 父子 Agent 协作模式：读取 feature_list.json 状态机，�
 3. Select the first item where `"passes": false`.
 4. If no pending item exists, stop and report that the queue is empty.
 5. If the queue is placeholder-only, not executable, or stale for the current requirement, stop and ask the human to run the planning flow first.
-6. Dispatch a worker with the selected task only, together with its validation steps and the escalation contract. Do not broaden the scope.
+6. Dispatch a worker with the selected `task_id` and task only, together with its validation steps and the escalation contract. Do not broaden the scope.
 7. Wait for the worker result.
-8. Verify acceptance:
-   * the assigned `feature_list.json` item is now `"passes": true`,
-   * `codex-progress.md` has a new matching entry,
+8. Verify the worker result:
    * the worker reports completed validation for every listed step,
-   * and the worker reports the concrete verification path used for the task, such as browser MCP, API requests, and database checks when applicable.
+   * the worker reports the concrete verification path used for the task, such as browser MCP, API requests, and database checks when applicable,
+   * and the worker changed only files inside the assigned task scope.
 9. If the worker reports any escalation, stop immediately and surface the blocker to the human.
-10. If acceptance fails, stop and surface the mismatch to the human.
-11. If acceptance succeeds, decrement the remaining task count and continue until the requested number is complete.
+10. If worker-result verification fails, stop and surface the mismatch to the human.
+11. If worker-result verification succeeds, the parent updates shared coordination files:
+   * set the assigned `task_id` in `feature_list.json` to `"passes": true`,
+   * append a matching entry to `codex-progress.md`,
+   * and refresh `agent-state.md` when the first pending task or recommended read path changes.
+12. Verify the updated coordination files, create the focused commit, decrement the remaining task count, and continue until the requested number is complete.
 
 ### Worker Loop
 1. Read `AGENTS.md` and obey the repository rules before touching code.
@@ -81,11 +84,10 @@ description: 父子 Agent 协作模式：读取 feature_list.json 状态机，�
    * backend logs, code path, and service logic,
    * database state or derived records.
 9. Self-repair at most 3 times for the same failing symptom. If the same blocker remains after the third attempt, stop and escalate instead of continuing.
-10. Only after all validation passes:
-   * set the task's `passes` field to `true`,
-   * append a task log to `codex-progress.md`,
-   * create a focused Git commit.
-11. Return control to the supervisor.
+10. Only after all validation passes, return validation evidence, changed files, and a concise progress-log draft to the supervisor.
+11. Do not mutate `feature_list.json`, `agent-state.md`, or `codex-progress.md` unless the assigned task is explicitly about those files.
+12. Do not run `git add`, `git commit`, or other Git post-processing commands.
+13. Return control to the supervisor.
 
 ### Human-in-the-Loop Triggers
 Stop the loop and ask for human input when:

@@ -20,7 +20,7 @@ Read on demand only:
 * `.ark/final_feature_list.json` — rolled-up previous task queues preserved by `$Task_init`
 * `.ark/codex-progress-archive.md` — older detailed history
 * `.ark/lessons.json` — cross-session knowledge base of discovered pitfalls and architecture facts
-* `.ark/project_goal.md` — current development goal, acceptance criteria, and gap analysis
+* `.ark/project_goal.md` — current development goal, acceptance criteria, mode, and gap analysis
 * `.ark/init.sh` — project startup and validation entry point
 * `.ark/rules/` — code constraint docs; read only the file that matches your task type (see Doc Routing)
 * `.ark/workflows/` — workflow contracts; read only when investigating the automation loop

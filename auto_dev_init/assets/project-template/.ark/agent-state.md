@@ -8,6 +8,7 @@
 
 ## Recommended Next Reads
 - `AGENTS.md`
+- `agent-state.md`
 - `feature_list.json`
 
 ## Active Blockers
@@ -16,3 +17,4 @@
 ## Notes
 - Keep this file short.
 - Update it when the next pending task or startup reading path materially changes.
+- `$Task_init` moves old active queues into `final_feature_list.json` before writing a new active queue.
